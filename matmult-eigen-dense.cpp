@@ -18,7 +18,6 @@ int main(int argc, char *argv[])
 {
   long N_COLS = 1024;
   long N_ROWS = 1024;
-  long N_VALUES = 200000;
 
   struct timespec start, end;
 
@@ -27,12 +26,8 @@ int main(int argc, char *argv[])
   else if (argc == 3) {
     N_ROWS = strtol(argv[1], NULL, 0); 
     N_COLS = strtol(argv[2], NULL, 0);
-  } else if (argc == 4) {
-    N_ROWS = strtol(argv[1], NULL, 0); 
-    N_COLS = strtol(argv[2], NULL, 0);
-    N_VALUES = strtol(argv[3], NULL, 0);
   }
-  printf("r/c/v: %ld %ld %ld\n", N_ROWS, N_COLS, N_VALUES);
+  printf("r/c: %ld %ld %ld\n", N_ROWS, N_COLS);
   
   MatrixXd A = MatrixXd::Random(N_ROWS,N_COLS);
   MatrixXd B = MatrixXd::Random(N_ROWS,N_COLS);
