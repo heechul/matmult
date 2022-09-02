@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
     N_ROWS = strtol(argv[1], NULL, 0); 
     N_COLS = strtol(argv[2], NULL, 0);
   }
-  printf("r/c: %ld %ld %ld\n", N_ROWS, N_COLS);
+  printf("r/c: %ld %ld\n", N_ROWS, N_COLS);
   
   MatrixXd A = MatrixXd::Random(N_ROWS,N_COLS);
   MatrixXd B = MatrixXd::Random(N_ROWS,N_COLS);
