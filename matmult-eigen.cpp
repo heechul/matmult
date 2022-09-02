@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <Eigen/SparseCore>
 #include <random>
 
 using namespace Eigen;
