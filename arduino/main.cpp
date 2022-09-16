@@ -62,23 +62,22 @@ void test_matmult_mine()
 		}
 	}  
 
-  startTime = millis();
+  startTime = (long)esp_timer_get_time();
   matmult(A, B, C, dimension);
-  dur = millis() - startTime;
-  Serial.printf("%s (naive): Took %3ld ms. result=%.3f\r\n", __FUNCTION__, dur, C[0*dimension+0]);  
+  dur = (long)esp_timer_get_time() - startTime;
+  Serial.printf("%s (naive): Took %ld us. result=%.3f\r\n", __FUNCTION__, dur, C[0*dimension+0]);  
 
   memset(C, 0, allocSize);
 
-  startTime = millis();
+  startTime = (long)esp_timer_get_time();
   matmult_opt1(A, B, C, dimension);
-  dur = millis() - startTime;
-  Serial.printf("%s (opt1): Took %3ld ms. result=%.3f\r\n", __FUNCTION__, dur, C[0*dimension+0]);  
+  dur = (long)esp_timer_get_time() - startTime;
+  Serial.printf("%s (opt1): Took %ld us. result=%.3f\r\n", __FUNCTION__, dur, C[0*dimension+0]);  
 
 	free(A);
 	free(B);
 	free(C);
 }
-
 
 void test_matmult_eigen()
 {
@@ -92,29 +91,40 @@ void test_matmult_eigen()
   SparseMatrix<double> big_B(N_ROWS, N_COLS);
   SparseMatrix<double> big_C(N_ROWS, N_COLS);
 
-  startTime = millis();
+  startTime = (long)esp_timer_get_time();
   C = A * B;
-  dur = millis() - startTime;
-  Serial.printf("%s (dense): Took %3ld ms. result=%.3f\r\n", __FUNCTION__, dur, C(0,0));  
+  dur = (long)esp_timer_get_time() - startTime;
+  Serial.printf("%s (dense): Took %ld us. result=%.3f\r\n", __FUNCTION__, dur, C(0,0));  
+
+  for (int i = 0; i < N_ROWS; i++)
+    for (int j = 0; j < N_COLS; j++) 
+      big_A.coeffRef(i,j) = A(i,j);
 
   int n_entries = N_ROWS * N_COLS * 0.1; /* 10% */
   for (int i = 0; i < N_ROWS; i++) {
     for (int j = 0; j < N_COLS; j++) {
-      big_A.coeffRef(i,j) = A(i,j);
-      big_B.coeffRef(i,j) = B(i,j);
+    retry:
+      int i_idx = esp_random() % N_ROWS;
+      int j_idx = esp_random() % N_COLS;
+
+      if (B(i_idx, j_idx) == -99999)
+        goto retry;
+      big_B.coeffRef(i_idx,j_idx) = B(i_idx,j_idx);
+      B(i_idx, j_idx) = -99999;
+      
       if ((i * N_ROWS + j) % n_entries == 0) {
-        startTime = millis();
+        startTime = (long)esp_timer_get_time();
         big_C = big_A * big_B;
-        dur = millis() - startTime;
-        Serial.printf("%s (sparse %ld): Took %3ld ms\r\n", 
+        dur = (long)esp_timer_get_time() - startTime;
+        Serial.printf("%s (sparse %ld): Took %ld us\r\n", 
           __FUNCTION__, (i * N_ROWS + j) / n_entries * 10, dur);  
       }
     }
   }
-  startTime = millis();
+  startTime = (long)esp_timer_get_time();
   big_C = big_A * big_B;
-  dur = millis() - startTime;
-  Serial.printf("%s (sparse %d): Took %3ld ms. result=%.3f\r\n", __FUNCTION__, 100, dur, big_C.coeffRef(0,0));  
+  dur = (long)esp_timer_get_time() - startTime;
+  Serial.printf("%s (sparse %d): Took %ld us. result=%.3f\r\n", __FUNCTION__, 100, dur, big_C.coeffRef(0,0));  
 }
 
 void setup() {
