@@ -17,3 +17,11 @@
 | 2000	    | 1.488919	| 0.510150	    | 2.017370      |	
 
 (units are in seconds).
+
+## For pico
+```
+mkdir build
+cd build
+cmake ..
+make -j4
+```
