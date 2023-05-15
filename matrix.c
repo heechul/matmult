@@ -1,6 +1,12 @@
 // https://vaibhaw-vipul.medium.com/matrix-multiplication-optimizing-the-code-from-6-hours-to-1-sec-70889d33dcfa
+// 
+// g++ matrix.c -Ofast -march=native -flto
 
-#define _GNU_SOURCE             /* See feature_test_macros(7) */
+
+#ifndef _GNU_SOURCE
+#  define _GNU_SOURCE             /* See feature_test_macros(7) */
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
@@ -75,6 +81,33 @@ void matmult_opt2(float *A, float *B, float *C, int dimension)
         }
     }	
 }
+
+#include <emmintrin.h> // SSE2 Intrinsics
+#include <smmintrin.h> // SSE4.2 Intrinsics
+
+void matrixMultiplySSE(float* matrixA, float* matrixB, float* result, int size) {
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+
+            __m128 sum = _mm_setzero_ps(); // Initialize sum to zero
+
+            for (int k = 0; k < size; k += 4) {
+                // fprintf(stderr, "[%d,%d,%d]\n", i, j, k);
+                __m128 a = _mm_load_ps(matrixA + i * size + k); // Load 4 values from matrixA
+                __m128 b = _mm_load_ps(matrixB + j * size + k); // Load 4 values from matrixB
+                __m128 mul = _mm_dp_ps(a, b, 0xF1); // Multiply and accumulate using dot product
+
+                sum = _mm_add_ps(sum, mul);
+                // Repeat the above steps for the remaining elements of the current row and column
+            }
+
+            // Store the result in the output matrix
+            _mm_store_ss(result + i * size + j, sum);
+            // fprintf(stderr, "[%d,%d]=%.2f\n", i, j, result[i*size+j]);
+        }
+    }
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -157,7 +190,11 @@ int main(int argc, char *argv[])
     case 2:
         matmult_opt2(A, Bt, C, dimension);
         break;
+    case 3:
+        matrixMultiplySSE(A, Bt, C, dimension);
+        break;
     }
+    
     end = timestamp();
     printf("matmult secs: %.6f\n", end-start);
     
