@@ -5,6 +5,8 @@
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
+using namespace std;
+
 uint64_t get_elapsed(struct timespec *start, struct timespec *end)
 {
 	uint64_t dur;

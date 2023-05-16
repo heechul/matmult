@@ -82,6 +82,7 @@ void matmult_opt2(float *A, float *B, float *C, int dimension)
     }	
 }
 
+#ifdef __SSE__
 #include <emmintrin.h> // SSE2 Intrinsics
 #include <smmintrin.h> // SSE4.2 Intrinsics
 
@@ -107,7 +108,7 @@ void matrixMultiplySSE(float* matrixA, float* matrixB, float* result, int size) 
         }
     }
 }
-
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -160,7 +161,7 @@ int main(int argc, char *argv[])
     end = timestamp();
     printf("init secs: %.6f\n", end-start);
 
-    if (algo == 2) {
+    if (algo == 2 || algo == 3) {
         // copy
         start = timestamp();    
         for(i = 0; i < dimension; i++) {
@@ -190,9 +191,11 @@ int main(int argc, char *argv[])
     case 2:
         matmult_opt2(A, Bt, C, dimension);
         break;
+#ifdef __SSE__
     case 3:
         matrixMultiplySSE(A, Bt, C, dimension);
         break;
+#endif
     }
     
     end = timestamp();
