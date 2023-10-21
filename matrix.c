@@ -72,11 +72,14 @@ void transpose_naive(float *src, float *dst, int src_row, int src_col)
 void matmult_opt2(float *A, float *B, float *C, int dimension)
 {
     int i,j,k;
+    int alloc_size = dimension*dimension*sizeof(float);
+    float *Bt = (float*)malloc(alloc_size);
+    transpose_naive(B, Bt, dimension, dimension);
 
     for(i = 0; i < dimension; i++) {
         for(j = 0; j < dimension; j++) {
             for(k = 0; k < dimension; k++) {                            
-                C[dimension*i+j] += A[dimension*i+k] * B[dimension*j+k];
+                C[dimension*i+j] += A[dimension*i+k] * Bt[dimension*j+k];
             }
         }
     }	
@@ -86,16 +89,20 @@ void matmult_opt2(float *A, float *B, float *C, int dimension)
 #include <emmintrin.h> // SSE2 Intrinsics
 #include <smmintrin.h> // SSE4.2 Intrinsics
 
-void matrixMultiplySSE(float* matrixA, float* matrixB, float* result, int size) {
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
+void matmult_opt3(float* A, float* B, float* C, int dimension) {
 
+    int alloc_size = dimension*dimension*sizeof(float);
+    float *Bt = (float*)malloc(alloc_size);
+    transpose_naive(B, Bt, dimension, dimension);
+
+    for (int i = 0; i < dimension; i++) {
+        for (int j = 0; j < dimension; j++) {
             __m128 sum = _mm_setzero_ps(); // Initialize sum to zero
 
-            for (int k = 0; k < size; k += 4) {
+            for (int k = 0; k < dimension; k += 4) {
                 // fprintf(stderr, "[%d,%d,%d]\n", i, j, k);
-                __m128 a = _mm_load_ps(matrixA + i * size + k); // Load 4 values from matrixA
-                __m128 b = _mm_load_ps(matrixB + j * size + k); // Load 4 values from matrixB
+                __m128 a = _mm_load_ps(A + i * dimension + k); // Load 4 values from matrixA
+                __m128 b = _mm_load_ps(Bt + j * dimension + k); // Load 4 values from matrixB
                 __m128 mul = _mm_dp_ps(a, b, 0xF1); // Multiply and accumulate using dot product
 
                 sum = _mm_add_ps(sum, mul);
@@ -103,12 +110,61 @@ void matrixMultiplySSE(float* matrixA, float* matrixB, float* result, int size) 
             }
 
             // Store the result in the output matrix
-            _mm_store_ss(result + i * size + j, sum);
-            // fprintf(stderr, "[%d,%d]=%.2f\n", i, j, result[i*size+j]);
+            _mm_store_ss(C + i * dimension + j, sum);
+            // fprintf(stderr, "[%d,%d]=%.2f\n", i, j, result[i*dimension+j]);
         }
     }
 }
 #endif
+#ifdef __ARM_NEON
+#include <arm_neon.h>
+void matmult_opt3(float* A, float* B, float* C, int dimension) {
+
+    int alloc_size = dimension*dimension*sizeof(float);
+    float *Bt = (float*)malloc(alloc_size);
+    transpose_naive(B, Bt, dimension, dimension);
+
+    for (int i = 0; i < dimension; i++) {
+        for (int j = 0; j < dimension; j++) {
+            float accumulators[4] = {0, 0, 0, 0};
+            float32x4_t *acc = (float32x4_t *) accumulators;
+            for (int k = 0; k < dimension; k += 4) {
+                // fprintf(stderr, "[%d,%d,%d]\n", i, j, k);
+                float32x4_t a = vld1q_f32(A + i * dimension + k); // Load 4 values from matrixA
+                float32x4_t b = vld1q_f32(B + j * dimension + k); // Load 4 values from matrixB
+                float32x4_t mul = vmulq_f32(a, b); // Multiply and accumulate using dot product
+                *acc = vaddq_f32(*acc, mul);
+                // Repeat the above steps for the remaining elements of the current row and column
+            }
+
+            // Store the result in the output matrix
+            *(C + i * dimension + j) = accumulators[0] + accumulators[1] + accumulators[2] + accumulators[3];
+            // fprintf(stderr, "[%d,%d]=%.2f\n", i, j, result[i*dimension+j]);
+        }
+    }
+}
+#endif
+
+// matrix multiplication with tiling    
+void matmult_opt4(float *A, float *B, float *C, int dimension)
+{
+    int i,j,k,ii,jj,kk;
+    int bs = 16; // block size = 32*32*4 = 4KB
+
+    for(i = 0; i < dimension; i+=bs) {
+        for(k = 0; k < dimension; k+=bs) {
+            for(j = 0; j < dimension; j+=bs) {
+                for(ii = i; ii < i+bs; ii++) {
+                    for(kk = k; kk < k+bs; kk++) {
+                        for(jj = j; jj < j+bs; jj++) {
+                            C[dimension*ii+jj] += A[dimension*ii+kk] * B[dimension*kk+jj];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}   
 
 int main(int argc, char *argv[])
 {
@@ -122,7 +178,7 @@ int main(int argc, char *argv[])
     /*
      * get command line options 
      */
-    while ((opt = getopt(argc, argv, "m:a:n:t:c:i:p:o:f:l:xh")) != -1) {
+    while ((opt = getopt(argc, argv, "m:k:n:a:")) != -1) {
         switch (opt) {
         case 'n':
             dimension = strtol(optarg, NULL, 0);
@@ -139,12 +195,10 @@ int main(int argc, char *argv[])
     int alloc_size = dimension*dimension*sizeof(float);
     A = (float*)malloc(alloc_size);
     B = (float*)malloc(alloc_size);
-    Bt = (float*)malloc(alloc_size);
     C = (float*)malloc(alloc_size);
     memset(A, 0, alloc_size);
     memset(B, 0, alloc_size);
     memset(C, 0, alloc_size);
-    memset(Bt, 0, alloc_size);
     
     srand(292);
 
@@ -159,25 +213,7 @@ int main(int argc, char *argv[])
         }
     }
     end = timestamp();
-    printf("init secs: %.6f\n", end-start);
-
-    if (algo == 2 || algo == 3) {
-        // copy
-        start = timestamp();    
-        for(i = 0; i < dimension; i++) {
-            for(j = 0; j < dimension; j++) {
-                Bt[dimension*i+j] = B[dimension*i+j];
-            }
-        }
-        end = timestamp();
-        printf("Bt=B secs: %.6f\n", end-start);
-    
-        // do transpose
-        start = timestamp();
-        transpose_naive(B, Bt, dimension, dimension);
-        end = timestamp();    
-        printf("transpose secs: %.6f\n", end-start);
-    }
+    // printf("init secs: %.6f\n", end-start);
     
     // do matrix multiplication
     start = timestamp();
@@ -189,13 +225,14 @@ int main(int argc, char *argv[])
         matmult_opt1(A, B, C, dimension);
         break;
     case 2:
-        matmult_opt2(A, Bt, C, dimension);
+        matmult_opt2(A, B, C, dimension);
         break;
-#ifdef __SSE__
     case 3:
-        matrixMultiplySSE(A, Bt, C, dimension);
+        matmult_opt3(A, B, C, dimension);
         break;
-#endif
+    case 4:
+        matmult_opt4(A, B, C, dimension);
+        break;
     }
     
     end = timestamp();
