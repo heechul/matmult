@@ -32,6 +32,26 @@ double timestamp()
     return t;
 }
 
+float print_checksum(float *C, int dimention)
+{
+    float sum = 0.0;
+    for(int i = 0; i < dimention; i++) {
+        for(int j = 0; j < dimention; j++) {
+            sum += C[i*dimention+j];
+        }
+    }
+    return sum;
+}
+
+#define BENCH(func) \
+    memset(C, 0, alloc_size); \
+    start = timestamp(); \
+    func; \
+    end = timestamp(); \
+    print_checksum(C, dimension); \
+    printf(#func " secs: %.6f  chsum: %.6f\n", end-start, print_checksum(C, dimension));
+
+
 // a naive matrix multiplication implementation. 
 void matmult(float *A, float *B, float *C, int dimension)
 {
@@ -149,7 +169,7 @@ void matmult_opt3(float* A, float* B, float* C, int dimension) {
 void matmult_opt4(float *A, float *B, float *C, int dimension)
 {
     int i,j,k,ii,jj,kk;
-    int bs = 16; // block size = 32*32*4 = 4KB
+    int bs = 32; // block size = 32*32*4 = 4KB
 
     for(i = 0; i < dimension; i+=bs) {
         for(k = 0; k < dimension; k+=bs) {
@@ -173,7 +193,7 @@ int main(int argc, char *argv[])
     int i, j, k;
     
     int opt;
-    int algo = 0;
+    int algo = 99;
     
     /*
      * get command line options 
@@ -214,39 +234,36 @@ int main(int argc, char *argv[])
     }
     end = timestamp();
     // printf("init secs: %.6f\n", end-start);
-    
     // do matrix multiplication
-    start = timestamp();
+
     switch(algo) {
     case 0:
-        matmult(A, B, C, dimension);
+        BENCH(matmult(A, B, C, dimension))
         break;
     case 1:
-        matmult_opt1(A, B, C, dimension);
+        BENCH(matmult_opt1(A, B, C, dimension))
         break;
     case 2:
-        matmult_opt2(A, B, C, dimension);
+        BENCH(matmult_opt2(A, B, C, dimension))
         break;
     case 3:
-        matmult_opt3(A, B, C, dimension);
+        BENCH(matmult_opt3(A, B, C, dimension))
         break;
     case 4:
-        matmult_opt4(A, B, C, dimension);
+        BENCH(matmult_opt4(A, B, C, dimension))
+        break;
+    case 99:
+        BENCH(matmult(A, B, C, dimension))
+        BENCH(matmult_opt1(A, B, C, dimension))
+        BENCH(matmult_opt2(A, B, C, dimension))
+        BENCH(matmult_opt3(A, B, C, dimension))
+        BENCH(matmult_opt4(A, B, C, dimension))
+        break;
+    default:
+        printf("invalid algorithm\n");
         break;
     }
     
-    end = timestamp();
-    printf("matmult secs: %.6f\n", end-start);
-    
-    // print sum
-    float sum = 0; 
-    for (i = 0; i < dimension; i++) {
-        for (j = 0; j < dimension; j++) {
-            sum += C[dimension * i + j];
-        }
-    }
-
-    printf("C sums: %f\n", sum);
     free(A);
     free(B);
     free(C);
