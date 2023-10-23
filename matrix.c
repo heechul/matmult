@@ -131,20 +131,18 @@ void matmult_opt3_transposed_simd(float* A, float* B, float* C, int dimension) {
 
     for (int i = 0; i < dimension; i++) {
         for (int j = 0; j < dimension; j++) {
-            __m128 sum = _mm_setzero_ps(); // Initialize sum to zero
-
+            float accumulators[4] = {0, 0, 0, 0};
+            __m128 *acc = (__m128 *) accumulators;
             for (int k = 0; k < dimension; k += 4) {
                 // fprintf(stderr, "[%d,%d,%d]\n", i, j, k);
                 __m128 a = _mm_load_ps(A + i * dimension + k); // Load 4 values from matrixA
                 __m128 b = _mm_load_ps(Bt + j * dimension + k); // Load 4 values from matrixB
-                __m128 mul = _mm_dp_ps(a, b, 0xF1); // Multiply and accumulate using dot product
-
-                sum = _mm_add_ps(sum, mul);
+                __m128 mul = _mm_mul_ps(a, b); // Multiply and accumulate using dot product
+                *acc = _mm_add_ps(*acc, mul);
                 // Repeat the above steps for the remaining elements of the current row and column
             }
-
             // Store the result in the output matrix
-            _mm_store_ss(C + i * dimension + j, sum);
+            *(C + i * dimension + j) = accumulators[0] + accumulators[1] + accumulators[2] + accumulators[3];
             // fprintf(stderr, "[%d,%d]=%.2f\n", i, j, result[i*dimension+j]);
         }
     }
