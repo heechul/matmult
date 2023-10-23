@@ -32,9 +32,23 @@ double timestamp()
     return t;
 }
 
-float print_checksum(float *C, int dimention)
+void init_data(float *A, float *B, float *C, int dimension)
 {
-    float sum = 0.0;
+    int i, j, k;
+    srand(292);
+    for(i = 0; i < dimension; i++) {
+        for(j = 0; j < dimension; j++) {
+            A[dimension*i+j] = (float)rand()/(float)(RAND_MAX) - 0.5;
+            B[dimension*i+j] = (float)rand()/(float)(RAND_MAX) - 0.5;
+            C[dimension*i+j] = 0.0;
+        }
+        // printf("%f %f\n", A[dimension*i+j], B[dimension*i+j]);
+    }
+}
+
+double print_checksum(float *C, int dimention)
+{
+    double sum = 0.0;
     for(int i = 0; i < dimention; i++) {
         for(int j = 0; j < dimention; j++) {
             sum += C[i*dimention+j];
@@ -44,33 +58,33 @@ float print_checksum(float *C, int dimention)
 }
 
 #define BENCH(func) \
-    memset(C, 0, alloc_size); \
+    init_data(A, B, C, dimension); \
     start = timestamp(); \
     func; \
     end = timestamp(); \
     print_checksum(C, dimension); \
-    printf(#func " secs: %.6f  chsum: %.6f\n", end-start, print_checksum(C, dimension));
+    printf(#func "  secs: %.6f  chsum: %.6f\n", end-start, print_checksum(C, dimension));
 
 
 // a naive matrix multiplication implementation. 
-void matmult(float *A, float *B, float *C, int dimension)
+void matmult_opt0_naive(float *A, float *B, float *C, int dimension)
 {
     for(int i = 0; i < dimension; i++) {
         for(int j = 0; j < dimension; j++) {
             for(int k = 0; k < dimension; k++) {
-                C[dimension*i+j] += A[dimension*i+k] * B[dimension*k+j];
+                C[dimension*i+j] += (A[dimension*i+k] * B[dimension*k+j]);
             }
         }
     }	
 }
 
 // a better cache optimized version: change the order to improve the cache hit rate
-void matmult_opt1(float *A, float *B, float *C, int dimension)
+void matmult_opt1_jk(float *A, float *B, float *C, int dimension)
 {
     for(int i = 0; i < dimension; i++) {
         for(int k = 0; k < dimension; k++) {
             for(int j = 0; j < dimension; j++) {
-                C[dimension*i+j] += A[dimension*i+k] * B[dimension*k+j];
+                C[dimension*i+j] += (A[dimension*i+k] * B[dimension*k+j]);
             }
         }
     }	
@@ -88,8 +102,7 @@ void transpose_naive(float *src, float *dst, int src_row, int src_col)
     }
 }
 
-
-void matmult_opt2(float *A, float *B, float *C, int dimension)
+void matmult_opt2_transposed(float *A, float *B, float *C, int dimension)
 {
     int i,j,k;
     int alloc_size = dimension*dimension*sizeof(float);
@@ -99,17 +112,18 @@ void matmult_opt2(float *A, float *B, float *C, int dimension)
     for(i = 0; i < dimension; i++) {
         for(j = 0; j < dimension; j++) {
             for(k = 0; k < dimension; k++) {                            
-                C[dimension*i+j] += A[dimension*i+k] * Bt[dimension*j+k];
+                C[dimension*i+j] += (A[dimension*i+k] * Bt[dimension*j+k]);
             }
         }
-    }	
+    }
+    free(Bt);
 }
 
 #ifdef __SSE__
 #include <emmintrin.h> // SSE2 Intrinsics
 #include <smmintrin.h> // SSE4.2 Intrinsics
 
-void matmult_opt3(float* A, float* B, float* C, int dimension) {
+void matmult_opt3_transposed_simd(float* A, float* B, float* C, int dimension) {
 
     int alloc_size = dimension*dimension*sizeof(float);
     float *Bt = (float*)malloc(alloc_size);
@@ -134,16 +148,17 @@ void matmult_opt3(float* A, float* B, float* C, int dimension) {
             // fprintf(stderr, "[%d,%d]=%.2f\n", i, j, result[i*dimension+j]);
         }
     }
+    free(Bt);
 }
-#endif
-#ifdef __ARM_NEON
+#elif __ARM_NEON
 #include <arm_neon.h>
-void matmult_opt3(float* A, float* B, float* C, int dimension) {
+void matmult_opt3_transposed_simd(float* A, float* B, float* C, int dimension) {
 
     int alloc_size = dimension*dimension*sizeof(float);
     float *Bt = (float*)malloc(alloc_size);
     transpose_naive(B, Bt, dimension, dimension);
 
+    // matrix multiplication of A and B into C
     for (int i = 0; i < dimension; i++) {
         for (int j = 0; j < dimension; j++) {
             float accumulators[4] = {0, 0, 0, 0};
@@ -151,22 +166,22 @@ void matmult_opt3(float* A, float* B, float* C, int dimension) {
             for (int k = 0; k < dimension; k += 4) {
                 // fprintf(stderr, "[%d,%d,%d]\n", i, j, k);
                 float32x4_t a = vld1q_f32(A + i * dimension + k); // Load 4 values from matrixA
-                float32x4_t b = vld1q_f32(B + j * dimension + k); // Load 4 values from matrixB
+                float32x4_t b = vld1q_f32(Bt + j * dimension + k); // Load 4 values from matrixB
                 float32x4_t mul = vmulq_f32(a, b); // Multiply and accumulate using dot product
                 *acc = vaddq_f32(*acc, mul);
                 // Repeat the above steps for the remaining elements of the current row and column
             }
-
             // Store the result in the output matrix
             *(C + i * dimension + j) = accumulators[0] + accumulators[1] + accumulators[2] + accumulators[3];
             // fprintf(stderr, "[%d,%d]=%.2f\n", i, j, result[i*dimension+j]);
         }
     }
+    free(Bt);
 }
-#endif
+#endif // __SSE__ __ARM_NEON
 
 // matrix multiplication with tiling    
-void matmult_opt4(float *A, float *B, float *C, int dimension)
+void matmult_opt4_jk_tiling(float *A, float *B, float *C, int dimension)
 {
     int i,j,k,ii,jj,kk;
     int bs = 32; // block size = 32*32*4 = 4KB
@@ -177,7 +192,7 @@ void matmult_opt4(float *A, float *B, float *C, int dimension)
                 for(ii = i; ii < i+bs; ii++) {
                     for(kk = k; kk < k+bs; kk++) {
                         for(jj = j; jj < j+bs; jj++) {
-                            C[dimension*ii+jj] += A[dimension*ii+kk] * B[dimension*kk+jj];
+                            C[dimension*ii+jj] += (A[dimension*ii+kk] * B[dimension*kk+jj]);
                         }
                     }
                 }
@@ -220,44 +235,30 @@ int main(int argc, char *argv[])
     memset(B, 0, alloc_size);
     memset(C, 0, alloc_size);
     
-    srand(292);
-
-    // init
-    start = timestamp();
-    for(i = 0; i < dimension; i++) {
-        for(j = 0; j < dimension; j++) {
-            A[dimension*i+j] = (rand()/(RAND_MAX + 1.0)) - 0.5;
-            B[dimension*i+j] = (rand()/(RAND_MAX + 1.0)) - 0.5;
-            C[dimension*i+j] = 0.0;
-            // printf("%f %f\n", A[i*dimension+j], B[i*dimension+j]);
-        }
-    }
-    end = timestamp();
-    // printf("init secs: %.6f\n", end-start);
     // do matrix multiplication
 
     switch(algo) {
     case 0:
-        BENCH(matmult(A, B, C, dimension))
+        BENCH(matmult_opt0_naive(A, B, C, dimension))
         break;
     case 1:
-        BENCH(matmult_opt1(A, B, C, dimension))
+        BENCH(matmult_opt1_jk(A, B, C, dimension))
         break;
     case 2:
-        BENCH(matmult_opt2(A, B, C, dimension))
+        BENCH(matmult_opt2_transposed(A, B, C, dimension))
         break;
     case 3:
-        BENCH(matmult_opt3(A, B, C, dimension))
+        BENCH(matmult_opt3_transposed_simd(A, B, C, dimension))
         break;
     case 4:
-        BENCH(matmult_opt4(A, B, C, dimension))
+        BENCH(matmult_opt4_jk_tiling(A, B, C, dimension))
         break;
     case 99:
-        BENCH(matmult(A, B, C, dimension))
-        BENCH(matmult_opt1(A, B, C, dimension))
-        BENCH(matmult_opt2(A, B, C, dimension))
-        BENCH(matmult_opt3(A, B, C, dimension))
-        BENCH(matmult_opt4(A, B, C, dimension))
+        BENCH(matmult_opt0_naive(A, B, C, dimension))
+        BENCH(matmult_opt1_jk(A, B, C, dimension))
+        BENCH(matmult_opt2_transposed(A, B, C, dimension))
+        BENCH(matmult_opt3_transposed_simd(A, B, C, dimension))
+        BENCH(matmult_opt4_jk_tiling(A, B, C, dimension))
         break;
     default:
         printf("invalid algorithm\n");
