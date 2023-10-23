@@ -1,7 +1,9 @@
-// https://vaibhaw-vipul.medium.com/matrix-multiplication-optimizing-the-code-from-6-hours-to-1-sec-70889d33dcfa
-// 
-// g++ matrix.c -Ofast -march=native -flto
-
+// References:
+// - https://vaibhaw-vipul.medium.com/matrix-multiplication-optimizing-the-code-from-6-hours-to-1-sec-70889d33dcfa
+// - https://www.dropbox.com/scl/fi/42b23nby5k5d09bpwd1cx/lec11.pdf?rlkey=e2ce7bs8ssgtb82isxgv4y7ij&dl=0 
+//
+// how to compile with gcc:
+// $ gcc -Ofast -march=native -flto -std=c11 -o matrix matrix.c
 
 #ifndef _GNU_SOURCE
 #  define _GNU_SOURCE             /* See feature_test_macros(7) */
