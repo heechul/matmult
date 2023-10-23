@@ -63,7 +63,7 @@ double print_checksum(float *C, int dimention)
     func; \
     end = timestamp(); \
     print_checksum(C, dimension); \
-    printf(#func "  secs: %.6f  chsum: %.6f\n", end-start, print_checksum(C, dimension));
+    printf("%.12s  secs: %.6f  chsum: %.6f\n", #func, end-start, print_checksum(C, dimension));
 
 
 // a naive matrix multiplication implementation. 
@@ -123,6 +123,7 @@ void matmult_opt2_transposed(float *A, float *B, float *C, int dimension)
 #include <emmintrin.h> // SSE2 Intrinsics
 #include <smmintrin.h> // SSE4.2 Intrinsics
 
+// transposed with SIMD
 void matmult_opt3_transposed_simd(float* A, float* B, float* C, int dimension) {
 
     int alloc_size = dimension*dimension*sizeof(float);
