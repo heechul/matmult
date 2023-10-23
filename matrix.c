@@ -78,7 +78,7 @@ void matmult_opt0_naive(float *A, float *B, float *C, int dimension)
     }	
 }
 
-// a better cache optimized version: change the order to improve the cache hit rate
+// matrix multiplication with jk order switch
 void matmult_opt1_jk(float *A, float *B, float *C, int dimension)
 {
     for(int i = 0; i < dimension; i++) {
@@ -90,8 +90,29 @@ void matmult_opt1_jk(float *A, float *B, float *C, int dimension)
     }	
 }
 
+// matrix multiplication with jk order switch and tiling    
+void matmult_opt2_jk_tiling(float *A, float *B, float *C, int dimension)
+{
+    int i,j,k,ii,jj,kk;
+    int bs = 64; // block size = 32*32*4 = 4KB
 
-// transposed
+    for(i = 0; i < dimension; i+=bs) {
+        for(k = 0; k < dimension; k+=bs) {
+            for(j = 0; j < dimension; j+=bs) {
+                for(ii = i; ii < i+bs; ii++) {
+                    for(kk = k; kk < k+bs; kk++) {
+                        for(jj = j; jj < j+bs; jj++) {
+                            C[dimension*ii+jj] += (A[dimension*ii+kk] * B[dimension*kk+jj]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}   
+
+
+// transpose matrix
 void transpose_naive(float *src, float *dst, int src_row, int src_col)
 // src: m(src_row) x n(src_col)  -> dst: n x m
 {
@@ -102,7 +123,8 @@ void transpose_naive(float *src, float *dst, int src_row, int src_col)
     }
 }
 
-void matmult_opt2_transposed(float *A, float *B, float *C, int dimension)
+// matrix multiplicaiton after transposed
+void matmult_opt3_transposed(float *A, float *B, float *C, int dimension)
 {
     int i,j,k;
     int alloc_size = dimension*dimension*sizeof(float);
@@ -123,8 +145,8 @@ void matmult_opt2_transposed(float *A, float *B, float *C, int dimension)
 #include <emmintrin.h> // SSE2 Intrinsics
 #include <smmintrin.h> // SSE4.2 Intrinsics
 
-// transposed with SIMD
-void matmult_opt3_transposed_simd(float* A, float* B, float* C, int dimension) {
+// matrix multiplicaiton transposed with SIMD
+void matmult_opt4_transposed_simd(float* A, float* B, float* C, int dimension) {
 
     int alloc_size = dimension*dimension*sizeof(float);
     float *Bt = (float*)malloc(alloc_size);
@@ -151,7 +173,8 @@ void matmult_opt3_transposed_simd(float* A, float* B, float* C, int dimension) {
 }
 #elif __ARM_NEON
 #include <arm_neon.h>
-void matmult_opt3_transposed_simd(float* A, float* B, float* C, int dimension) {
+// matrix multiplicaiton transposed with SIMD
+void matmult_opt4_transposed_simd(float* A, float* B, float* C, int dimension) {
 
     int alloc_size = dimension*dimension*sizeof(float);
     float *Bt = (float*)malloc(alloc_size);
@@ -178,27 +201,6 @@ void matmult_opt3_transposed_simd(float* A, float* B, float* C, int dimension) {
     free(Bt);
 }
 #endif // __SSE__ __ARM_NEON
-
-// matrix multiplication with tiling    
-void matmult_opt4_jk_tiling(float *A, float *B, float *C, int dimension)
-{
-    int i,j,k,ii,jj,kk;
-    int bs = 64; // block size = 32*32*4 = 4KB
-
-    for(i = 0; i < dimension; i+=bs) {
-        for(k = 0; k < dimension; k+=bs) {
-            for(j = 0; j < dimension; j+=bs) {
-                for(ii = i; ii < i+bs; ii++) {
-                    for(kk = k; kk < k+bs; kk++) {
-                        for(jj = j; jj < j+bs; jj++) {
-                            C[dimension*ii+jj] += (A[dimension*ii+kk] * B[dimension*kk+jj]);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}   
 
 int main(int argc, char *argv[])
 {
@@ -244,20 +246,20 @@ int main(int argc, char *argv[])
         BENCH(matmult_opt1_jk(A, B, C, dimension))
         break;
     case 2:
-        BENCH(matmult_opt2_transposed(A, B, C, dimension))
+        BENCH(matmult_opt2_jk_tiling(A, B, C, dimension))
         break;
     case 3:
-        BENCH(matmult_opt3_transposed_simd(A, B, C, dimension))
+        BENCH(matmult_opt3_transposed(A, B, C, dimension))
         break;
     case 4:
-        BENCH(matmult_opt4_jk_tiling(A, B, C, dimension))
+        BENCH(matmult_opt4_transposed_simd(A, B, C, dimension))
         break;
     case 99:
         BENCH(matmult_opt0_naive(A, B, C, dimension))
         BENCH(matmult_opt1_jk(A, B, C, dimension))
-        BENCH(matmult_opt2_transposed(A, B, C, dimension))
-        BENCH(matmult_opt3_transposed_simd(A, B, C, dimension))
-        BENCH(matmult_opt4_jk_tiling(A, B, C, dimension))
+        BENCH(matmult_opt2_jk_tiling(A, B, C, dimension))
+        BENCH(matmult_opt3_transposed(A, B, C, dimension))
+        BENCH(matmult_opt4_transposed_simd(A, B, C, dimension))
         break;
     default:
         printf("invalid algorithm\n");
