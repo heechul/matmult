@@ -1,3 +1,6 @@
+// how to compile: 
+// $ g++ -I/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3 -Ofast -march=native -flto  -std=c++17 -o matmult-eigen-dense matmult-eigen-dense.cpp
+
 #include <iostream>
 #include <Eigen/Dense>
 #include <time.h>

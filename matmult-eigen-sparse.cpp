@@ -1,3 +1,12 @@
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// how to compile: 
+// $ g++ -I/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3 -Ofast -march=native -flto  -std=c++17 -o matmult-eigen-dense matmult-eigen-dense.cpp
+//
+// how to run:
+// $ ./matmult-eigen-dense <N_ROWS> <N_COLS> <N_VALUES>
+//   if N_ROWS and N_COLS are not specified, they are set to 1024
+//   if N_VALUES is not specified, it is set to 200000
+
 #include <iostream>
 #include <cstdlib>
 #include <vector>

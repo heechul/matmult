@@ -6,7 +6,7 @@ LFLAGS=-flto
 CXX=g++
 CXXFLAGS=-I/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3 $(OPTS) -std=c++17
 
-matrix: matrix.o
-matmult-eigen: matmult-eigen.o
+all: matrix matmult-eigen-dense matmult-eigen-sparse
+
 clean:
-	rm *.o
+	rm -f matrix matmult-eigen-dense matmult-eigen-sparse
