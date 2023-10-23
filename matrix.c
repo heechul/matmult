@@ -184,7 +184,7 @@ void matmult_opt3_transposed_simd(float* A, float* B, float* C, int dimension) {
 void matmult_opt4_jk_tiling(float *A, float *B, float *C, int dimension)
 {
     int i,j,k,ii,jj,kk;
-    int bs = 32; // block size = 32*32*4 = 4KB
+    int bs = 64; // block size = 32*32*4 = 4KB
 
     for(i = 0; i < dimension; i+=bs) {
         for(k = 0; k < dimension; k+=bs) {
