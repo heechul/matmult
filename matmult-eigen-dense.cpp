@@ -1,5 +1,14 @@
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // how to compile: 
 // $ g++ -I/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3 -Ofast -march=native -flto  -std=c++17 -o matmult-eigen-dense matmult-eigen-dense.cpp
+//
+// how to run:
+// $ ./matmult-eigen-dense
+// or
+// $ ./matmult-eigen-dense <N_ROWS>
+// or
+// $ ./matmult-eigen-dense <N_ROWS> <N_COLS>
+//   if N_ROWS and N_COLS are not specified, they are set to 1024
 
 #include <iostream>
 #include <Eigen/Dense>
