@@ -96,7 +96,7 @@ void matmult_opt1_jk(float *A, float *B, float *C, int dimension)
 void matmult_opt2_jk_tiling(float *A, float *B, float *C, int dimension)
 {
     int i,j,k,ii,jj,kk;
-    int bs = 64; // block size = 32*32*4 = 4KB
+    int bs = 64; // block size = 64*64*4 = 16KB
 
     for(i = 0; i < dimension; i+=bs) {
         for(k = 0; k < dimension; k+=bs) {
