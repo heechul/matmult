@@ -202,6 +202,10 @@ void matmult_opt4_transposed_simd(float* A, float* B, float* C, int dimension) {
     }
     free(Bt);
 }
+#else
+void matmult_opt4_transposed_simd(float* A, float* B, float* C, int dimension) {
+    fprintf(stderr, "SIMD is not supported\n");
+}
 #endif // __SSE__ __ARM_NEON
 
 int main(int argc, char *argv[])
