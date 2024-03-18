@@ -1,31 +1,10 @@
-// References:
-// - https://vaibhaw-vipul.medium.com/matrix-multiplication-optimizing-the-code-from-6-hours-to-1-sec-70889d33dcfa
-// - https://www.dropbox.com/scl/fi/42b23nby5k5d09bpwd1cx/lec11.pdf?rlkey=e2ce7bs8ssgtb82isxgv4y7ij&dl=0 
-//
-// how to compile with gcc:
-// $ gcc -Ofast -march=native -flto -std=c11 -o matrix matrix.c
+#include <Arduino.h>
 
-#ifndef _GNU_SOURCE
-#  define _GNU_SOURCE             /* See feature_test_macros(7) */
-#endif
+// .platformio/packages/framework-arduinoespressif32/tools/sdk/include/config/sdkconfig.h
+// #define CONFIG_ARDUINO_LOOP_STACK_SIZE 16384
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <signal.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sched.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/resource.h>
-#include <string.h>
-// #include <omp.h>
-
-/* change dimension size as needed */
 struct timeval tv; 
-int dimension = 1024;
-double start, end; /* time */
-
+double start, end;
 double timestamp()
 {
     double t;
@@ -96,7 +75,7 @@ void matmult_opt1_jk(float *A, float *B, float *C, int dimension)
 void matmult_opt2_jk_tiling(float *A, float *B, float *C, int dimension)
 {
     int i,j,k,ii,jj,kk;
-    int bs = 64; // block size = 64*64*4 = 16KB
+    int bs = 32; // block size = 32*32*4 = 4KB
 
     for(i = 0; i < dimension; i+=bs) {
         for(k = 0; k < dimension; k+=bs) {
@@ -208,12 +187,13 @@ void matmult_opt4_transposed_simd(float* A, float* B, float* C, int dimension) {
 }
 #endif // __SSE__ __ARM_NEON
 
+
 int bench_matmult(int dimension, int algo)
 {
     float *A, *B, *Bt, *C;
     unsigned finish = 0;
     int i, j, k;
-    
+
     printf("dimension: %d, algorithm: %d ws: %.1f\n", dimension, algo,
            (float)dimension*dimension*sizeof(float)*3/1024);
 
@@ -262,25 +242,29 @@ int bench_matmult(int dimension, int algo)
     return 0;
 }
 
-int main(int argc, char *argv[])
-{
-    int opt;
+void setup() {
     int algo = 99;
-    int dimension = 1024;
+    int dimension = 64;
 
-    /*
-     * get command line options 
-     */
-    while ((opt = getopt(argc, argv, "m:k:n:a:")) != -1) {
-        switch (opt) {
-        case 'n':
-            dimension = strtol(optarg, NULL, 0);
-            break;
-        case 'a':
-            algo = strtol(optarg, NULL, 0);
-            break;
+    // put your setup code here, to run once:
+    Serial.begin(115200);
+
+    while(!Serial) {
+        static int retries = 0;
+        delay(1000); // Wait for serial monitor to open
+        if (retries++ > 5) {
+        break;
         }
-    }
+    } // When the serial monitor is turned on, the program starts to execute
+
+    Serial.printf("Total heap: %d\n", ESP.getHeapSize());
+    Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
+    Serial.printf("Total PSRAM: %d\n", ESP.getPsramSize());
+    Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
+
     bench_matmult(dimension, algo);
-    return 0;
+}
+
+void loop() {
+  // put your main code here, to run repeatedly: 
 }
