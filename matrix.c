@@ -96,7 +96,7 @@ void matmult_opt1_jk(float *A, float *B, float *C, int dimension)
 void matmult_opt2_jk_tiling(float *A, float *B, float *C, int dimension)
 {
     int i,j,k,ii,jj,kk;
-    int bs = 64; // block size = 32*32*4 = 4KB
+    int bs = 256; // block size = 256*256*4 = 256KB
 
     for(i = 0; i < dimension; i+=bs) {
         for(k = 0; k < dimension; k+=bs) {
@@ -143,7 +143,53 @@ void matmult_opt3_transposed(float *A, float *B, float *C, int dimension)
     free(Bt);
 }
 
-#ifdef __SSE__
+
+
+#ifdef __AVX2__
+#include <immintrin.h> // AVX2 Intrinsics
+// matrix multiplicaiton transposed with AVX2 SIMD
+void matmult_opt4_transposed_simd(float* A, float* B, float* C, int dimension) {
+
+    int alloc_size = dimension*dimension*sizeof(float);
+    float *Bt = (float*)aligned_alloc(32, alloc_size); // 32-byte aligned allocation for AVX2
+    if (!Bt) {
+        fprintf(stderr, "Failed to allocate aligned memory\n");
+        return;
+    }
+    transpose_naive(B, Bt, dimension, dimension);
+
+    for (int i = 0; i < dimension; i++) {
+        for (int j = 0; j < dimension; j++) {
+            __m256 acc = _mm256_setzero_ps(); // Initialize accumulator to zero
+            int k;
+            // Process 8 elements at a time
+            for (k = 0; k <= dimension - 8; k += 8) {
+                __m256 a = _mm256_load_ps(A + i * dimension + k); // Use aligned load
+                __m256 b = _mm256_load_ps(Bt + j * dimension + k); // Use aligned load
+                __m256 mul = _mm256_mul_ps(a, b); // Multiply vectors
+                acc = _mm256_add_ps(acc, mul); // Accumulate
+            }
+
+            // Horizontal sum of the 8 elements in acc
+            __m128 hi = _mm256_extractf128_ps(acc, 1);
+            __m128 lo = _mm256_castps256_ps128(acc);
+            __m128 sum128 = _mm_add_ps(hi, lo);
+            sum128 = _mm_hadd_ps(sum128, sum128);
+            sum128 = _mm_hadd_ps(sum128, sum128);
+            float result = _mm_cvtss_f32(sum128);
+
+            // Handle remaining elements (if dimension is not divisible by 8)
+            for (; k < dimension; k++) {
+                result += A[i * dimension + k] * Bt[j * dimension + k];
+            }
+
+            // Store the result in the output matrix
+            C[i * dimension + j] = result;
+        }
+    }
+    free(Bt);
+}
+#elif __SSE__
 #include <emmintrin.h> // SSE2 Intrinsics
 #include <smmintrin.h> // SSE4.2 Intrinsics
 
@@ -202,7 +248,8 @@ void matmult_opt4_transposed_simd(float* A, float* B, float* C, int dimension) {
     }
     free(Bt);
 }
-#endif // __SSE__ __ARM_NEON
+#endif // AVX2 __SSE__ __ARM_NEON
+
 
 int main(int argc, char *argv[])
 {
@@ -216,7 +263,7 @@ int main(int argc, char *argv[])
     /*
      * get command line options 
      */
-    while ((opt = getopt(argc, argv, "m:k:n:a:")) != -1) {
+    while ((opt = getopt(argc, argv, "m:n:a:h")) != -1) {
         switch (opt) {
         case 'n':
             dimension = strtol(optarg, NULL, 0);
@@ -224,16 +271,30 @@ int main(int argc, char *argv[])
         case 'a':
             algo = strtol(optarg, NULL, 0);
             break;
+        case 'h':
+        default: /* '?' */
+            printf("Usage: %s [-n dimension] [-a algorithm]\n", argv[0]);
+            printf("  -n dimension: matrix dimension (default: 1024)\n");
+            printf("  -a algorithm: 0: naive, 1: jk, 2: jk_tiling, 3: transposed, 4: simd\n");
+            exit(EXIT_SUCCESS);
         }
+
     }
     
     printf("dimension: %d, algorithm: %d ws: %.1f\n", dimension, algo,
            (float)dimension*dimension*sizeof(float)*3/1024);
 
     int alloc_size = dimension*dimension*sizeof(float);
-    A = (float*)malloc(alloc_size);
-    B = (float*)malloc(alloc_size);
-    C = (float*)malloc(alloc_size);
+    // Use aligned allocation for better SIMD performance
+    A = (float*)aligned_alloc(32, alloc_size);
+    B = (float*)aligned_alloc(32, alloc_size);
+    C = (float*)aligned_alloc(32, alloc_size);
+
+    if (!A || !B || !C) {
+        fprintf(stderr, "Failed to allocate aligned memory for matrices\n");
+        exit(EXIT_FAILURE);
+    }
+
     memset(A, 0, alloc_size);
     memset(B, 0, alloc_size);
     memset(C, 0, alloc_size);
