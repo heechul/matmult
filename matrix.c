@@ -65,7 +65,7 @@ double print_checksum(float *C, int dimention)
     func; \
     end = timestamp(); \
     print_checksum(C, dimension); \
-    printf("%.12s  secs: %.6f  chsum: %.6f\n", #func, end-start, print_checksum(C, dimension));
+    printf("%.12s  %.6f  chsum: %.6f\n", #func, end-start, print_checksum(C, dimension));
 
 
 // a naive matrix multiplication implementation. 
@@ -281,8 +281,13 @@ int main(int argc, char *argv[])
 
     }
     
-    printf("dimension: %d, algorithm: %d ws: %.1f\n", dimension, algo,
-           (float)dimension*dimension*sizeof(float)*3/1024);
+    // set CPU priority to high
+    if (setpriority(PRIO_PROCESS, 0, -20) < 0) {
+        perror("setpriority");
+    }
+
+    // printf("dimension: %d, algorithm: %d ws: %.1f\n", dimension, algo,
+    //        (float)dimension*dimension*sizeof(float)*3/1024);
 
     int alloc_size = dimension*dimension*sizeof(float);
     // Use aligned allocation for better SIMD performance
